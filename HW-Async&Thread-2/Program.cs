@@ -1,5 +1,8 @@
 ﻿namespace HW_Async_Thread;
-namespace System.Threading.ReaderWriterLockSlim;
+
+using System.Runtime.CompilerServices;
+using System.Timers;
+using static System.Threading.ReaderWriterLockSlim;
 
 public static class Program
 {
@@ -83,6 +86,7 @@ public class TimeVariable(int initVal = 0, int lowerLimit = 0, int higherLimit =
     /// <summary>
     /// 变化速度，以毫秒计时
     /// </summary>
+
     private ReaderWriterLockSlim rwLockSpeed = new();
     public int Speed
     {
@@ -104,32 +108,10 @@ public class TimeVariable(int initVal = 0, int lowerLimit = 0, int higherLimit =
             // TODO 2:请思考speed的改变如何体现在val的变化上？
             try
             {
+                UpdateValue();
                 rwLockSpeed.EnterWriteLock();
-                if (speed < 0)
-                {
-                    if (val + speed * (Environment.TickCount - time) < LowerLimit)
-                    {
-                        Val = LowerLimit;
-                    }
-                    else
-                    {
-                        Val = val + speed * (Environment.TickCount - time);
-                    }
-                }
-                else
-                {
-                    if (val + speed * (Environment.TickCount - time) > HigherLimit)
-                    {
-                        Val = HigherLimit;
-                    }
-                    else
-                    {
-                        Val = val + speed * (Environment.TickCount - time);
-                    }
-                    time = Environment.TickCount;
-                    speed = value;
-
-                }
+                speed = value;
+            }
             finally
             {
                 rwLockSpeed.ExitWriteLock();
@@ -142,6 +124,7 @@ public class TimeVariable(int initVal = 0, int lowerLimit = 0, int higherLimit =
     /// 变量的值
     /// </summary>
     private ReaderWriterLockSlim rwLockVal = new();
+    private bool isForcedSet = false;
     public int Val
     {
         get
@@ -149,29 +132,11 @@ public class TimeVariable(int initVal = 0, int lowerLimit = 0, int higherLimit =
             // TODO 3:直接返回val是否是这个变量当前时刻的值？当然，可以有不同实现
             try
             {
+                if (!isForcedSet)
+                {
+                    UpdateValue();
+                }
                 rwLockVal.EnterReadLock();
-                if (speed < 0)
-                {
-                    if (val + speed * (Environment.TickCount - time) < LowerLimit)
-                    {
-                        val = LowerLimit;
-                    }
-                    else
-                    {
-                        val = val + speed * (Environment.TickCount - time);
-                    }
-                }
-                else
-                {
-                    if (val + speed * (Environment.TickCount - time) > HigherLimit)
-                    {
-                        val = HigherLimit;
-                    }
-                    else
-                    {
-                        val = val + speed * (Environment.TickCount - time);
-                    }
-                }
                 time = Environment.TickCount;
                 return val;
             }
@@ -192,6 +157,28 @@ public class TimeVariable(int initVal = 0, int lowerLimit = 0, int higherLimit =
             {
                 rwLockVal.ExitWriteLock();
             }
+        }
+    }
+    public void UpdateValue()
+    {
+        try
+        {
+            rwLockVal.EnterWriteLock();
+            var elapsed = Environment.TickCount - time;
+            var newVal = val + speed * elapsed;
+            if (newVal > HigherLimit)
+            {
+                newVal = HigherLimit;
+            }
+            else if (newVal < LowerLimit)
+            {
+                newVal = LowerLimit;
+            }
+            val = newVal;
+        }
+        finally
+        {
+            rwLockVal.ExitWriteLock();
         }
     }
 }
