@@ -1,4 +1,5 @@
 ﻿namespace HW_Async_Thread;
+namespace System.Threading.ReaderWriterLockSlim;
 
 public static class Program
 {
@@ -82,17 +83,57 @@ public class TimeVariable(int initVal = 0, int lowerLimit = 0, int higherLimit =
     /// <summary>
     /// 变化速度，以毫秒计时
     /// </summary>
+    private ReaderWriterLockSlim rwLockSpeed = new();
     public int Speed
     {
         get
         {
             // TODO 1:保护speed的读取
-            return speed;
+            try
+            {
+                rwLockSpeed.EnterReadLock();
+                return speed;
+            }
+            finally
+            {
+                rwLockSpeed.ExitReadLock();
+            }
         }
         set
         {
             // TODO 2:请思考speed的改变如何体现在val的变化上？
-            speed = value;
+            try
+            {
+                rwLockSpeed.EnterWriteLock();
+                if (speed < 0)
+                {
+                    if (val + speed * (Environment.TickCount - time) < LowerLimit)
+                    {
+                        Val = LowerLimit;
+                    }
+                    else
+                    {
+                        Val = val + speed * (Environment.TickCount - time);
+                    }
+                }
+                else
+                {
+                    if (val + speed * (Environment.TickCount - time) > HigherLimit)
+                    {
+                        Val = HigherLimit;
+                    }
+                    else
+                    {
+                        Val = val + speed * (Environment.TickCount - time);
+                    }
+                    time = Environment.TickCount;
+                    speed = value;
+
+                }
+            finally
+            {
+                rwLockSpeed.ExitWriteLock();
+            }
         }
     }
 
@@ -100,17 +141,57 @@ public class TimeVariable(int initVal = 0, int lowerLimit = 0, int higherLimit =
     /// <summary>
     /// 变量的值
     /// </summary>
+    private ReaderWriterLockSlim rwLockVal = new();
     public int Val
     {
         get
         {
             // TODO 3:直接返回val是否是这个变量当前时刻的值？当然，可以有不同实现
-            return val;
+            try
+            {
+                rwLockVal.EnterReadLock();
+                if (speed < 0)
+                {
+                    if (val + speed * (Environment.TickCount - time) < LowerLimit)
+                    {
+                        val = LowerLimit;
+                    }
+                    else
+                    {
+                        val = val + speed * (Environment.TickCount - time);
+                    }
+                }
+                else
+                {
+                    if (val + speed * (Environment.TickCount - time) > HigherLimit)
+                    {
+                        val = HigherLimit;
+                    }
+                    else
+                    {
+                        val = val + speed * (Environment.TickCount - time);
+                    }
+                }
+                time = Environment.TickCount;
+                return val;
+            }
+            finally
+            {
+                rwLockVal.ExitReadLock();
+            }
         }
         set
         {
             // TODO 4:保护val的写入
-            val = value;
+            try
+            {
+                rwLockVal.EnterWriteLock();
+                val = value;
+            }
+            finally
+            {
+                rwLockVal.ExitWriteLock();
+            }
         }
     }
 }
