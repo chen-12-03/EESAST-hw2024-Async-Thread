@@ -1,5 +1,5 @@
 ﻿namespace HW_Async_Thread;
-
+using static ReaderWriterLockSlim;
 public class Program
 {
     public static void Main()
@@ -56,12 +56,21 @@ public abstract class Expr
 public class ValueExpr(int initVal) : Expr
 {
     int val = initVal;
+    ReaderWriterLockSlim rwLock = new();
     public override int Val
     {
         get
         {
             // TODO 1:读取操作
-            return val;
+            try
+            {
+                rwLock.EnterReadLock();
+                return val;
+            }
+            finally
+            {
+                rwLock.ExitReadLock();
+            }
         }
     }
 
@@ -74,17 +83,31 @@ public class ValueExpr(int initVal) : Expr
         set
         {
             // TODO 2:修改操作
+            try
+            {
+                rwLock.EnterWriteLock();
+                val = value;
+            }
+            finally
+            {
+                rwLock.ExitWriteLock();
+            }
         }
     }
 
     public override async Task Update()
     {
         // TODO 3:更新操作
+        if (parent != null)
+        {
+            await parent.Update();
+        }
     }
 
     public override void Register(Expr parent)
     {
         // TODO 4:注册操作
+        this.parent = parent;
     }
 }
 
@@ -95,12 +118,24 @@ public class ValueExpr(int initVal) : Expr
 public class AddExpr : Expr
 {
     int val = 0;
+    ReaderWriterLockSlim rwLock = new();
     public override int Val
     {
         get
         {
             // TODO 5:读取操作
-            return val;
+            try
+            {
+                rwLock.EnterWriteLock();
+                val = ExprA.Val + ExprB.Val;
+                rwLock.ExitWriteLock();
+                rwLock.EnterReadLock();
+                return val;
+            }
+            finally
+            {
+                rwLock.ExitReadLock();
+            }
         }
     }
 
@@ -116,10 +151,12 @@ public class AddExpr : Expr
     public override async Task Update()
     {
         // TODO 6:更新操作
+        await Task.WhenAll(ExprA.Update(), ExprB.Update());
     }
 
     public override void Register(Expr parent)
     {
         // TODO 7:注册操作
+        this.parent = parent;
     }
 }
